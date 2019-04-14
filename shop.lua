@@ -1,92 +1,89 @@
-script_name("Shop assistant")
-script_author("James Hawk")
-script_version("1.0")
-script_dependencies("vkeys", "samp.events")
+script_name('RouletteClicker')
+script_author('James Hawk')
 
-local key = require "vkeys"
-local sampev = require "lib.samp.events"
-local enabled=false
-local flag=false
-
+local xCoord = 310
+local yCoord = 415
+local fRlt = true
+local fOpen = false
+local flag = false
+wTime=1800000
 
 function main()
-	if not isSampLoaded() or not isSampfuncsLoaded() then return end
+	if not isSampfuncsLoaded() or not isSampLoaded() then return end
 	while not isSampAvailable() do wait(100) end
 	
-	sampRegisterChatCommand("sh", function(arg)
+	sampRegisterChatCommand("rlt", function(arg)
 		enabled = not enabled
 		if enabled then
 			sampAddChatMessage(string.format("[%s]: Activated", thisScript().name), 0x40FF40)
-			flag=true
+			fRlt = true
+			fOpen = true
 		else
 			sampAddChatMessage(string.format("[%s]: Deactivated", thisScript().name), 0xFF4040)
-			flag=false
+			fRlt = false
+			fOpen = false
 		end
-		state, color, name = string.match(arg, "(%d+)%s+(%d+)%s+(.*)")
+		state = string.match(arg, "(%d+)")
+		if tonumber(state) == 1 then
+			flag = true
+			--sampAddChatMessage(string.format("[%s]: Timer will be activated", thisScript().name), 0xFFE4B5)
+		elseif tonumber(state) == 0 then
+			flag = false
+			--sampAddChatMessage(string.format("[%s]: Timer will be deactivated", thisScript().name), 0xFFE4B5)
+		end
 		return {arg}
 	end)
 	
-	sampRegisterChatCommand("sh_r", function()
+	sampRegisterChatCommand("rlt_r", function()
 		sampAddChatMessage(string.format("[%s]: RELOADING",thisScript().name), 0x0000FF)
 		thisScript():reload()
 	end)
 	
 	while true do
 		wait(0)
-		
-		if enabled and flag then
-			if wasKeyPressed(key.VK_X) then
-				sampAddChatMessage(string.format("[%s]: Deactivated", thisScript().name), 0xFF4040)
-				enabled=false
-				flag=false
-			end
-			setGameKeyState(21,255)			
-			wait(100)
-			if sampTextdrawIsExists(2109) and sampTextdrawIsExists(2111) then
-				if sampIsDialogActive() then
-					setVirtualKeyState(27)
-				end
-				wait(100)
-				setVirtualKeyState(27)
-			end
-			if sampIsDialogActive(3010) then
-				setVirtualKeyState(13)
-				wait(50)
-				if sampIsDialogActive(3021) then
-					sampSendDialogResponse(3021, 1, tonumber(state), -1)
-					wait(50)
-					if sampIsDialogActive(3020) then
-						sampSetCurrentDialogEditboxText(name)
-						wait(150)
-						if sampIsDialogActive(3030) then
-							sampSendDialogResponse(3030, 1, tonumber(color), -1)
-							wait(50)
-						end
-					end
+		if enabled and fOpen then
+			wait(50)
+			sampAddChatMessage(string.format("[%s]: Openning roulette", thisScript().name), 0xFFE4B5)
+			sampSendChat("/invent")
+			wait(2500) 
+			if sampTextdrawIsExists(2112) then
+				sampSendClickTextdraw(2112)
+				wait(1400)
+				if sampTextdrawIsExists(2197) and sampTextdrawIsExists(2199) then
+					sampSendClickTextdraw(2197)
 				end
 			end
-		elseif not enabled and flag then
-			setGameKeyState(21,0)
-			flag=false
-		end
+			wait(400)
+			if sampTextdrawIsExists(2186) then
+				sampSendClickTextdraw(2186)
+			end
+			fOpen = false
+			rltTimer()
+		end	
 	end
 end
 
-function setVirtualKeyState(key)
-	lua_thread.create(function(key)
-		setVirtualKeyDown(key, true)
-		wait(150)
-		setVirtualKeyDown(key, false)
-	end, key)
-end
-
-
-function sampev.onShowDialog(id, style, title, b1, b2, text)
+function rltTimer()
 	lua_thread.create(function()
-		if enabled then
-			if id == 3040 then
-				enabled=false
+		local rltTimer = os.clock()*1000 + wTime
+		while fRlt and not fOpen do
+			local remainingTime = math.floor((rltTimer - os.clock()*1000)/1000)
+			local seconds = remainingTime % 60
+			local minutes = math.floor(remainingTime / 60)
+			if flag then
+				if seconds >= 10 then
+					sampTextdrawCreate(16, "rlt " .. minutes .. ":" .. seconds, xCoord, yCoord)
+				else
+					sampTextdrawCreate(16, "rlt " ..  minutes .. ":0" .. seconds, xCoord, yCoord)
+				end
 			end
+			if seconds <= 0 and minutes <= 0 then
+				fRlt = false
+				fOpen = true
+			end
+			wait(100)
 		end
+		fRlt = true
+		if flag then sampTextdrawDelete(16) end
 	end)
 end
